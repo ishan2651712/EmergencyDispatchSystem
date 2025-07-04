@@ -1,0 +1,137 @@
+#pragma once
+#include <iostream>
+#include <queue>
+#include <unordered_map>
+#include <list>
+#include <stack>
+#include <chrono>
+#include <iomanip>
+#include "Emergency.h"
+#include "unit.h"
+
+using namespace std;
+using namespace chrono;
+
+class Dispatcher {
+private:
+    class LogEntry {
+    private:
+        int emergencyId;
+        string emergencyType;
+        string unitId;
+        int eta;
+        system_clock::time_point timeAssigned;
+
+    public:
+        LogEntry(int id, string type, string unit, int e, system_clock::time_point time)
+            : emergencyId(id), emergencyType(type), unitId(unit), eta(e), timeAssigned(time) {}
+
+        int getEmergencyId() const { return emergencyId; }
+        string getEmergencyType() const { return emergencyType; }
+        string getUnitId() const { return unitId; }
+        int getETA() const { return eta; }
+        system_clock::time_point getTimeAssigned() const { return timeAssigned; }
+    };
+
+    unordered_map<string, priority_queue<Unit, vector<Unit>, UnitComparator>> unitPool;
+    list<LogEntry> dispatchLogs;
+    stack<LogEntry> undoStack;
+
+public:
+    Dispatcher() {}
+
+    void addUnit(const Unit& unit) {
+        unitPool[unit.getType()].push(unit);
+    }
+
+    void dispatch(const Emergency& emergency) {
+        string type = emergency.getType();
+
+        if (!unitPool[type].empty()) {
+            Unit assigned = unitPool[type].top();
+            unitPool[type].pop();
+
+            system_clock::time_point now = system_clock::now();
+
+            LogEntry log(emergency.getRequestId(), type, assigned.getId(), assigned.getETA(), now);
+            dispatchLogs.push_back(log);
+            undoStack.push(log);
+
+            cout << "• Emergency ID: " << emergency.getRequestId()
+                 << " | Type: " << type
+                 << " | Severity: " << emergency.getSeverity() << "\n";
+            cout << "  → Assigned Unit: " << assigned.getId()
+                 << " (ETA: " << assigned.getETA() << " mins)"
+                 << " at " << timeToString(now) << "\n\n";
+        } else {
+            cout << "• Emergency ID: " << emergency.getRequestId()
+                 << " | Type: " << type
+                 << " | Severity: " << emergency.getSeverity() << "\n";
+            cout << "  ⚠️ No available units for this type!\n\n";
+        }
+    }
+
+    void undoLastDispatch() {
+        if (dispatchLogs.empty()) {
+            cout << "\n⚠️ No dispatches to undo!\n";
+            return;
+        }
+
+        LogEntry last = undoStack.top();
+        undoStack.pop();
+        dispatchLogs.pop_back();
+
+        Unit returnedUnit(last.getUnitId(), last.getEmergencyType(), last.getETA());
+        unitPool[last.getEmergencyType()].push(returnedUnit);
+
+        cout << "\n⏪ Undo Successful:\n";
+        cout << "• Emergency ID: " << last.getEmergencyId()
+             << " | Type: " << last.getEmergencyType()
+             << " | Returned Unit: " << last.getUnitId()
+             << " → Back to unit pool.\n";
+    }
+
+    void printLogs() const {
+        cout << "\n📜 Dispatch Log History:\n";
+        if (dispatchLogs.empty()) {
+            cout << "→ No dispatches logged yet.\n";
+            return;
+        }
+
+        for (const auto& entry : dispatchLogs) {
+            cout << "→ [" << timeToString(entry.getTimeAssigned()) << "] "
+                 << "Emergency ID: " << entry.getEmergencyId()
+                 << " | Type: " << entry.getEmergencyType()
+                 << " | Unit: " << entry.getUnitId()
+                 << " | ETA: " << entry.getETA() << " mins\n";
+        }
+    }
+
+    // ✅ Phase 5: Search by Emergency ID
+    void searchLogById(int id) const {
+        bool found = false;
+        for (const auto& entry : dispatchLogs) {
+            if (entry.getEmergencyId() == id) {
+                cout << "\n🔎 Emergency Found:\n";
+                cout << "→ Emergency ID: " << entry.getEmergencyId()
+                     << " | Type: " << entry.getEmergencyType()
+                     << " | Unit: " << entry.getUnitId()
+                     << " | ETA: " << entry.getETA() << " mins"
+                     << " | Assigned at: " << timeToString(entry.getTimeAssigned()) << "\n";
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            cout << "\n❌ No dispatch log found for Emergency ID: " << id << "\n";
+        }
+    }
+
+    static string timeToString(system_clock::time_point time) {
+        time_t timeRaw = system_clock::to_time_t(time);
+        char buffer[26];
+        ctime_r(&timeRaw, buffer);
+        buffer[24] = '\0';
+        return string(buffer);
+    }
+};
