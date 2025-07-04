@@ -1,0 +1,4 @@
+POL1,crime,3
+AMB1,medical,4
+fire,fire,4
+FIRE1,fire,4

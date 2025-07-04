@@ -6,8 +6,10 @@
 #include <stack>
 #include <chrono>
 #include <iomanip>
+#include <fstream>
 #include "Emergency.h"
 #include "unit.h"
+#include <sstream>
 
 using namespace std;
 using namespace chrono;
@@ -107,6 +109,29 @@ public:
         }
     }
 
+    // ✅ Phase 7: Export logs to a file
+    void exportLogsToFile(const string& filename) const {
+        ofstream outFile(filename, ios::app);
+
+        if (!outFile) {
+            cerr << "\n❌ Failed to open file: " << filename << "\n";
+            return;
+        }
+
+        outFile << "\n📦 Exported Dispatch Logs:\n";
+        for (const auto& entry : dispatchLogs) {
+            outFile << "→ [" << timeToString(entry.getTimeAssigned()) << "] "
+                    << "Emergency ID: " << entry.getEmergencyId()
+                    << " | Type: " << entry.getEmergencyType()
+                    << " | Unit: " << entry.getUnitId()
+                    << " | ETA: " << entry.getETA() << " mins\n";
+        }
+
+        outFile << "-------------------------------\n";
+        outFile.close();
+        cout << "\n✅ Logs exported successfully to: " << filename << "\n";
+    }
+
     // ✅ Phase 5: Search by Emergency ID
     void searchLogById(int id) const {
         bool found = false;
@@ -125,6 +150,106 @@ public:
         if (!found) {
             cout << "\n❌ No dispatch log found for Emergency ID: " << id << "\n";
         }
+    }
+
+    // ✅ Phase 6: Real-time unit availability status
+    void printUnitStatus() const {
+        cout << "\n📊 Current Unit Availability:\n";
+        if (unitPool.empty()) {
+            cout << "→ No units in the pool.\n";
+            return;
+        }
+
+        for (const auto& pair : unitPool) {
+            string type = pair.first;
+            auto pqCopy = pair.second;
+
+            cout << "• " << type << " Units (" << pqCopy.size() << " available):\n";
+            while (!pqCopy.empty()) {
+                Unit u = pqCopy.top();
+                pqCopy.pop();
+                cout << "   → ID: " << u.getId() << " | ETA: " << u.getETA() << " mins\n";
+            }
+        }
+    }
+
+    // ✅ Phase 9: Save dispatcher state to files
+    void saveStateToFiles() const {
+        ofstream unitsFile("units.txt");
+        ofstream logsFile("logs.txt");
+
+        if (!unitsFile || !logsFile) {
+            cerr << "❌ Error opening files to save state.\n";
+            return;
+        }
+
+        // Save units
+        for (const auto& pair : unitPool) {
+            string type = pair.first;
+            auto pqCopy = pair.second;
+
+            while (!pqCopy.empty()) {
+                Unit u = pqCopy.top(); pqCopy.pop();
+                unitsFile << u.getId() << "," << type << "," << u.getETA() << "\n";
+            }
+        }
+
+        // Save logs
+        for (const auto& entry : dispatchLogs) {
+            time_t raw = system_clock::to_time_t(entry.getTimeAssigned());
+            logsFile << entry.getEmergencyId() << "," << entry.getEmergencyType() << ","
+                     << entry.getUnitId() << "," << entry.getETA() << "," << raw << "\n";
+        }
+
+        unitsFile.close();
+        logsFile.close();
+        cout << "✅ State saved to units.txt and logs.txt\n";
+    }
+
+    // ✅ Phase 9: Load dispatcher state from files
+    void loadStateFromFiles() {
+        ifstream unitsFile("units.txt");
+        ifstream logsFile("logs.txt");
+
+        if (!unitsFile || !logsFile) {
+            cerr << "⚠️ No saved state found. Starting fresh.\n";
+            return;
+        }
+
+        unitPool.clear();
+        dispatchLogs.clear();
+
+        string line;
+        // Load units
+        while (getline(unitsFile, line)) {
+            stringstream ss(line);
+            string id, type, etaStr;
+            getline(ss, id, ',');
+            getline(ss, type, ',');
+            getline(ss, etaStr, ',');
+
+            unitPool[type].push(Unit(id, type, stoi(etaStr)));
+        }
+
+        // Load logs
+        while (getline(logsFile, line)) {
+            stringstream ss(line);
+            string idStr, type, unit, etaStr, timeStr;
+            getline(ss, idStr, ',');
+            getline(ss, type, ',');
+            getline(ss, unit, ',');
+            getline(ss, etaStr, ',');
+            getline(ss, timeStr, ',');
+
+            int eid = stoi(idStr);
+            int eta = stoi(etaStr);
+            time_t rawTime = stol(timeStr);
+            system_clock::time_point logTime = system_clock::from_time_t(rawTime);
+
+            dispatchLogs.push_back(LogEntry(eid, type, unit, eta, logTime));
+        }
+
+        cout << "✅ State loaded from files.\n";
     }
 
     static string timeToString(system_clock::time_point time) {
