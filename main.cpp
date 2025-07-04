@@ -11,6 +11,12 @@
 #include <algorithm>
 
 using namespace std;
+string toLower(const string& str) {
+    string lower;
+    for (char c : str)
+        lower += tolower(c);
+    return lower;
+}
 
 set<int> usedIds; // to avoid duplicate emergency IDs
 
@@ -55,6 +61,7 @@ int main() {
         cout << "8. Export Logs to File\n";
         cout << "9. Exit\n";
         cout << "10. Generate Random Emergencies\n";
+        cout << "11. View System Statistics\n";
         cout << "Enter choice (1-10): ";
         cin >> choice;
 
@@ -64,8 +71,22 @@ int main() {
                 int eta;
                 cout << "Enter Unit ID: ";
                 cin >> id;
-                cout << "Enter Unit Type (Fire/Medical/Crime): ";
-                cin >> type;
+            
+ while (true) {
+        cout << "Enter Unit Type (Fire/Medical/Crime): ";
+        cin >> type;
+
+        // Convert to lowercase
+        transform(type.begin(), type.end(), type.begin(), ::tolower);
+
+        if (type == "fire" || type == "medical" || type == "crime") {
+            break;
+        } else {
+            cout << "❌ Invalid type. Please enter Fire, Medical, or Crime.\n";
+        }
+    }
+                cout << "Enter ETA (in minutes): ";
+                cin >> eta;
                 transform(type.begin(), type.end(), type.begin(), ::tolower); // normalize
                 dispatcher.addUnit(Unit(id, type, eta));
                 cout << "✅ Unit added.\n";
@@ -138,6 +159,9 @@ int main() {
                 }
                 break;
             }
+        case 11:
+        dispatcher.viewStatistics();
+        break;
 
             case 9:
                 dispatcher.saveStateToFiles();

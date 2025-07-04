@@ -38,16 +38,23 @@ private:
     unordered_map<string, priority_queue<Unit, vector<Unit>, UnitComparator>> unitPool;
     list<LogEntry> dispatchLogs;
     stack<LogEntry> undoStack;
+static string toLower(const string& str) {
+    string result = str;
+    transform(result.begin(), result.end(), result.begin(), ::tolower);
+    return result;
+}
 
 public:
     Dispatcher() {}
 
     void addUnit(const Unit& unit) {
-        unitPool[unit.getType()].push(unit);
+        unitPool[toLower(unit.getType())].push(unit); // 👈 fix here
+
     }
 
     void dispatch(const Emergency& emergency) {
-        string type = emergency.getType();
+        string type = toLower(emergency.getType()); // 👈 fix here too
+
 
         if (!unitPool[type].empty()) {
             Unit assigned = unitPool[type].top();
@@ -228,7 +235,8 @@ public:
             getline(ss, type, ',');
             getline(ss, etaStr, ',');
 
-            unitPool[type].push(Unit(id, type, stoi(etaStr)));
+            unitPool[toLower(type)].push(Unit(id, toLower(type), stoi(etaStr))); // 👈 fix
+
         }
 
         // Load logs
@@ -258,5 +266,45 @@ public:
         ctime_r(&timeRaw, buffer);
         buffer[24] = '\0';
         return string(buffer);
+    }
+    //✅ Phase 12: Emergency Dispatch Analytics
+    void viewStatistics() const {
+        if (dispatchLogs.empty()) {
+            cout << "\n📉 No dispatches to analyze.\n";
+            return;
+        }
+
+        int total = dispatchLogs.size();
+        unordered_map<string, int> unitTypeCount;
+        unordered_map<string, int> emergencyTypeCount;
+        int totalETA = 0;
+
+        for (const auto& log : dispatchLogs) {
+            string type = log.getEmergencyType();
+            unitTypeCount[type]++;
+            emergencyTypeCount[type]++;
+            totalETA += log.getETA();
+        }
+
+        // Determine most common emergency type
+        string mostCommonType = "N/A";
+        int maxCount = 0;
+        for (const auto& pair : emergencyTypeCount) {
+            if (pair.second > maxCount) {
+                maxCount = pair.second;
+                mostCommonType = pair.first;
+            }
+        }
+
+        double avgETA = static_cast<double>(totalETA) / total;
+
+        cout << "\n📊 Emergency Dispatch Analytics:\n";
+        cout << "• Total Dispatches: " << total << "\n";
+        cout << "• Units Used by Type:\n";
+        for (const auto& pair : unitTypeCount) {
+            cout << "   → " << pair.first << ": " << pair.second << "\n";
+        }
+        cout << "• Average ETA: " << fixed << setprecision(2) << avgETA << " mins\n";
+        cout << "• Most Common Emergency Type: " << mostCommonType << "\n";
     }
 };
